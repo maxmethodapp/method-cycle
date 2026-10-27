@@ -1,0 +1,670 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="theme-color" content="#F5F0E8">
+<title>METHOD — Cycle</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,400&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body { margin: 0; padding: 0; height: 100%; }
+  body { background: #E7E1D6; font-family: 'DM Sans', system-ui, sans-serif; -webkit-font-smoothing: antialiased; }
+  #root { min-height: 100%; }
+  .tnum { font-variant-numeric: tabular-nums; font-feature-settings: 'tnum' 1; }
+  .noscroll::-webkit-scrollbar { width: 0; height: 0; } .noscroll { scrollbar-width: none; }
+  button { font-family: inherit; cursor: pointer; }
+  input, textarea { font-family: inherit; }
+  .press { transition: transform .12s ease, opacity .12s ease, background-color .15s ease, border-color .15s ease; }
+  .press:active { transform: scale(0.975); opacity: .9; }
+  @keyframes mFade { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+  @keyframes mRise { from { opacity: 0; transform: translateY(14px); } to { opacity: 1; transform: none; } }
+  @keyframes mBlink { 0%,60%,100% { opacity:.3; transform:translateY(0) } 30% { opacity:1; transform:translateY(-2px) } }
+</style>
+</head>
+<body>
+<div id="root"></div>
+
+<script crossorigin src="https://cdnjs.cloudflare.com/ajax/libs/react/18.3.1/umd/react.production.min.js"></script>
+<script crossorigin src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.3.1/umd/react-dom.production.min.js"></script>
+<script crossorigin src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.26.4/babel.min.js"></script>
+<script crossorigin src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
+
+<script>
+// ════════════════════════════════════════════════════════════════
+//  CONFIG — the only block you edit.
+//  Leave SUPABASE_URL empty and the app runs in local-only mode
+//  (data stays in this phone's browser) until you're ready.
+// ════════════════════════════════════════════════════════════════
+window.METHOD_CONFIG = {
+  SUPABASE_URL: 'https://gkxchdkelwybpnkdheoz.supabase.co',            // e.g. 'https://abcdefgh.supabase.co'
+  SUPABASE_ANON_KEY: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImdreGNoZGtlbHd5YnBua2RoZW96Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODAwODExMTgsImV4cCI6MjA5NTY1NzExOH0.iKewsYGr79DYAvQkLzxUqQINjy-VJ3_TBBUoahjuaVE',       // Project settings → API → anon public key
+  COACH_NAME: 'METHOD',
+  COACH_FUNCTION: 'coach',     // name of the Edge Function (see supabase/functions/coach)
+  LOCAL_NAME: 'Holly',         // name shown in local-only mode (no login)
+};
+</script>
+
+<script type="text/babel">
+const { useState, useEffect, useMemo, useRef } = React;
+const CFG = window.METHOD_CONFIG;
+
+// ── Palette + type (METHOD brand guide §06) ─────────────────────
+const M = {
+  paper:'#F5F0E8', bone:'#FFFFFF', ink:'#15191A',
+  mint:'#49BBA0', mint600:'#2E8A75', mint700:'#1F5C4E',
+  mint50:'#F5FAF8', mint100:'#E5F1EC', mint200:'#C8E6DC', mint300:'#9ED6C2', mint400:'#6CC5AB',
+  ink50:'#FAFAF8', ink100:'#EDEBE7', ink200:'#D5D2CC', ink300:'#A8ACA8', ink400:'#6E726F', ink500:'#3E4341', ink600:'#2A2E2D',
+  amber:'#E0A24A', coral:'#D77559', slate:'#5B7B85', navy:'#1F3A48',
+};
+const FONT = { display:"'DM Sans', system-ui, sans-serif", body:"'DM Sans', system-ui, sans-serif", mono:"'JetBrains Mono', ui-monospace, monospace" };
+
+const ICON = {
+  cyclef:'M12 14a4 4 0 1 0 0-8 4 4 0 0 0 0 8ZM12 14v6M9 18h6',
+  calendar:'M5 5h14v15H5zM5 9h14M9 3v4M15 3v4',
+  chat:'M21 11.5a8.4 8.4 0 0 1-8.5 8.5 8.5 8.5 0 0 1-3.8-.9L3 21l1.9-5.7A8.4 8.4 0 0 1 4 11.5 8.5 8.5 0 0 1 12.5 3 8.4 8.4 0 0 1 21 11.5Z',
+  close:'M6 6l12 12M18 6L6 18', send:'M22 2L11 13M22 2l-7 20-4-9-9-4 20-7z',
+  chevL:'M15 6l-6 6 6 6', chevron:'M9 6l6 6-6 6',
+  settings:'M22.31 10.62L22.31 13.38L19.35 13.95L18.57 15.82L20.27 18.31L18.31 20.27L15.82 18.57L13.95 19.35L13.38 22.31L10.62 22.31L10.05 19.35L8.18 18.57L5.69 20.27L3.73 18.31L5.43 15.82L4.65 13.95L1.69 13.38L1.69 10.62L4.65 10.05L5.43 8.18L3.73 5.69L5.69 3.73L8.18 5.43L10.05 4.65L10.62 1.69L13.38 1.69L13.95 4.65L15.82 5.43L18.31 3.73L20.27 5.69L18.57 8.18L19.35 10.05ZM15.4 12a3.4 3.4 0 1 1-6.8 0 3.4 3.4 0 0 1 6.8 0Z',
+  trend:'M3 17l5-6 4 3 6-8M14 6h5v5', complete:'M5 12.5l4.5 4.5L19 7', plus:'M12 5v14M5 12h14', shield:'M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10Z',
+};
+function Icon({ name, size = 22, color = M.ink, stroke = 1.5, style }) {
+  return <svg width={size} height={size} viewBox="0 0 24 24" fill="none" style={{ display:'block', flexShrink:0, ...style }}>
+    <path d={ICON[name]} stroke={color} strokeWidth={stroke} strokeLinecap="round" strokeLinejoin="round" />
+  </svg>;
+}
+
+// ── Primitives ──────────────────────────────────────────────────
+const Label = ({ children, color = M.ink400, size = 10, style }) => <div style={{ fontFamily:FONT.mono, fontSize:size, letterSpacing:'0.12em', textTransform:'uppercase', color, ...style }}>{children}</div>;
+const Display = ({ children, size = 26, color = M.ink, style }) => <div style={{ fontFamily:FONT.display, fontWeight:700, fontSize:size, lineHeight:1.06, letterSpacing:'-0.01em', color, ...style }}>{children}</div>;
+const Card = ({ children, pad = 16, style, onClick }) => <div onClick={onClick} className={onClick ? 'press' : ''} style={{ background:M.bone, borderRadius:16, padding:pad, border:`1px solid ${M.ink100}`, boxShadow:'0 1px 2px rgba(21,25,26,0.04)', ...style }}>{children}</div>;
+const Pill = ({ children, tone = 'mint' }) => {
+  const t = { mint:[M.mint100,M.mint700], coral:['rgba(215,117,89,0.12)',M.coral], amber:['rgba(224,162,74,0.14)','#9A6A20'], slate:['rgba(91,123,133,0.14)',M.slate], ink:[M.ink100,M.ink500] }[tone];
+  return <span style={{ display:'inline-flex', alignItems:'center', padding:'4px 9px', borderRadius:999, background:t[0], color:t[1], fontFamily:FONT.mono, fontSize:9.5, letterSpacing:'0.08em', whiteSpace:'nowrap' }}>{children}</span>;
+};
+const MintBtn = ({ children, onClick, disabled, style }) => <button disabled={disabled} onClick={onClick} className="press" style={{ width:'100%', padding:'15px 18px', borderRadius:14, border:'none', background:disabled ? M.ink200 : M.mint, color:M.ink, fontFamily:FONT.body, fontWeight:600, fontSize:15, ...style }}>{children}</button>;
+const GhostBtn = ({ children, onClick, style }) => <button onClick={onClick} className="press" style={{ padding:'12px 16px', borderRadius:12, border:`1.5px solid ${M.ink100}`, background:M.bone, color:M.ink, fontFamily:FONT.body, fontWeight:600, fontSize:13.5, ...style }}>{children}</button>;
+const SectionHead = ({ label, action, onAction, mt = 24 }) => <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginTop:mt, marginBottom:10 }}><Label>{label}</Label>{action && <button onClick={onAction} style={{ border:'none', background:'none', fontFamily:FONT.body, fontSize:12.5, fontWeight:600, color:M.mint600, padding:0 }}>{action}</button>}</div>;
+
+// ── Dates ───────────────────────────────────────────────────────
+const pad2 = n => String(n).padStart(2, '0');
+const isoLocal = d => `${d.getFullYear()}-${pad2(d.getMonth()+1)}-${pad2(d.getDate())}`;
+const TODAY = isoLocal(new Date());
+const parseISO = s => new Date(s + 'T12:00:00');
+const addDays = (iso, n) => { const d = parseISO(iso); d.setDate(d.getDate()+n); return isoLocal(d); };
+const diffDays = (a, b) => Math.round((parseISO(a) - parseISO(b)) / 86400000);
+const fmt = iso => parseISO(iso).toLocaleDateString('en-GB', { weekday:'short', day:'numeric', month:'short' }).replace(/,/g,'').toUpperCase();
+const fmtShort = iso => parseISO(iso).toLocaleDateString('en-GB', { day:'numeric', month:'short' });
+
+// ── Cycle maths (Garibaldi C: four broad phases, held loosely) ───
+const PHASES = [
+  { id:'menstrual', name:'Menstrual', sub:'early follicular', color:M.coral },
+  { id:'follicular', name:'Follicular', sub:'late follicular', color:M.mint },
+  { id:'ovulation', name:'Ovulation', sub:'mid-cycle', color:M.amber },
+  { id:'luteal', name:'Luteal', sub:'pre-menstrual at the end', color:M.slate },
+];
+function periodStarts(logs) {
+  const explicit = logs.filter(l => l.period_start).map(l => l.log_date);
+  const byDate = new Set(logs.filter(l => l.period).map(l => l.log_date));
+  const inferred = [...byDate].filter(d => !byDate.has(addDays(d, -1)) && !byDate.has(addDays(d, -2)));
+  const all = [...new Set([...explicit, ...inferred])].sort();
+  // an inferred start within 3 days after an explicit one is the same period, drop it
+  return all.filter((d, i) => i === 0 || explicit.includes(d) || diffDays(d, all[i-1]) > 3);
+}
+function learnedPeriodLen(logs, starts) {
+  const ends = logs.filter(l => l.period_end).map(l => l.log_date).sort();
+  const lens = starts.map(st => { const en = ends.find(e => e >= st && diffDays(e, st) <= 10); return en ? diffDays(en, st) + 1 : null; }).filter(Boolean);
+  return lens.length ? Math.round(lens.reduce((a,b)=>a+b,0) / lens.length) : null;
+}
+function cycleModel(logs, settings) {
+  const starts = periodStarts(logs);
+  const gaps = starts.slice(1).map((s, i) => diffDays(s, starts[i])).filter(g => g >= 18 && g <= 45);
+  const length = gaps.length ? Math.round(gaps.reduce((a,b)=>a+b,0) / gaps.length) : (settings.cycle_length || 28);
+  const lastStart = starts[starts.length - 1] || null;
+  const day = lastStart ? diffDays(TODAY, lastStart) + 1 : null;
+  const periodLen = learnedPeriodLen(logs, starts) || settings.period_length || 5;
+  const ovDay = Math.max(periodLen + 3, length - 14);
+  const phaseOf = d => d == null ? null : d <= periodLen ? PHASES[0] : d < ovDay - 1 ? PHASES[1] : d <= ovDay + 1 ? PHASES[2] : PHASES[3];
+  const segs = [
+    { ...PHASES[0], from:1, to:periodLen }, { ...PHASES[1], from:periodLen+1, to:ovDay-2 },
+    { ...PHASES[2], from:ovDay-1, to:ovDay+1 }, { ...PHASES[3], from:ovDay+2, to:length },
+  ];
+  const nextStart = lastStart ? addDays(lastStart, length) : null;
+  // Forward predictions: next 4 cycles from the last logged start. Estimates, held loosely.
+  const predicted = [];
+  if (lastStart) for (let k = 0; k <= 4; k++) {
+    const st = addDays(lastStart, k * length); const ov = addDays(st, ovDay - 1);
+    predicted.push({ start: st, end: addDays(st, periodLen - 1), ovStart: addDays(ov, -1), ov, ovEnd: addDays(ov, 1), future: st > TODAY });
+  }
+  const predictFor = iso => { if (iso <= TODAY) return null; for (const c of predicted) { if (iso >= c.start && iso <= c.end) return 'period'; if (iso >= c.ovStart && iso <= c.ovEnd) return 'ovulation'; } return null; };
+  const overdue = day != null && day > length;
+  return { starts, length, lastStart, day, phase: phaseOf(day), phaseOf, segs, nextStart, overdue, predicted, predictFor, estimated: gaps.length > 0, periodLen,
+    dayFor: iso => { const prior = starts.filter(s => s <= iso); const s = prior[prior.length-1]; return s ? diffDays(iso, s) + 1 : null; } };
+}
+
+// Patterns: her data, tentatively worded. Needs >= 3 logs in a phase before it says anything.
+function buildPatterns(logs, model) {
+  const out = [];
+  const byPhase = {};
+  logs.forEach(l => { const d = model.dayFor(l.log_date); const p = model.phaseOf(d); if (!p) return; (byPhase[p.id] ||= []).push({ ...l, day:d }); });
+  const avg = (arr, k) => { const v = arr.map(x => x[k]).filter(x => x != null); return v.length >= 3 ? v.reduce((a,b)=>a+b,0)/v.length : null; };
+  const all = { energy: avg(logs, 'energy'), motivation: avg(logs, 'motivation'), mood: avg(logs, 'mood') };
+  PHASES.forEach(p => {
+    const arr = byPhase[p.id] || [];
+    ['energy','motivation','mood'].forEach(k => {
+      const a = avg(arr, k); if (a == null || all[k] == null) return;
+      const d = a - all[k];
+      if (d <= -0.6) out.push({ color:p.color, t:`You've tended to log lower ${k} in your ${p.name.toLowerCase()} days (${arr.length} logs).` });
+      if (d >= 0.6) out.push({ color:p.color, t:`Your ${k} has often read higher in your ${p.name.toLowerCase()} days — a window you may want to use.` });
+    });
+    const sym = {}; arr.forEach(l => (l.symptoms||[]).forEach(s => sym[s] = (sym[s]||0)+1));
+    Object.entries(sym).forEach(([s, n]) => { if (s !== 'good' && arr.length >= 3 && n / arr.length >= 0.5) out.push({ color:p.color, t:`${SYMPTOM_LABEL[s] || s} has come up in ${n} of ${arr.length} ${p.name.toLowerCase()} logs.` }); });
+  });
+  return out.slice(0, 4);
+}
+
+const SYMPTOM_OPTS = [
+  { id:'good', label:'All good' }, { id:'cramps', label:'Cramps' }, { id:'fatigue', label:'Low energy' },
+  { id:'headache', label:'Headache' }, { id:'bloating', label:'Bloating' }, { id:'sleep', label:'Poor sleep' }, { id:'flat', label:'Flat / unmotivated' },
+];
+const SYMPTOM_LABEL = Object.fromEntries(SYMPTOM_OPTS.map(o => [o.id, o.label]));
+
+// ── Storage: Supabase (login) when configured, localStorage otherwise ──
+const sb = (CFG.SUPABASE_URL && CFG.SUPABASE_ANON_KEY && window.supabase)
+  ? window.supabase.createClient(CFG.SUPABASE_URL, CFG.SUPABASE_ANON_KEY)
+  : null;
+const LOCAL_LOGS = 'method_cycle_logs_local', LOCAL_SETTINGS = 'method_cycle_settings_local';
+
+const store = {
+  mode: sb ? 'supabase' : 'local',
+  user: null,
+  async loadLogs() {
+    if (sb) { const { data, error } = await sb.from('cycle_logs').select('*').order('log_date'); if (error) throw error; return data; }
+    try { return JSON.parse(localStorage.getItem(LOCAL_LOGS) || '[]').sort((a,b) => a.log_date < b.log_date ? -1 : 1); } catch (e) { return []; }
+  },
+  async saveLog(entry) {
+    const row = { ...entry, updated_at: new Date().toISOString() };
+    if (sb) { const { error } = await sb.from('cycle_logs').upsert({ ...row, athlete_id: this.user.id }, { onConflict: 'athlete_id,log_date' }); if (error) throw error; return; }
+    const logs = (await this.loadLogs()).filter(l => l.log_date !== entry.log_date);
+    localStorage.setItem(LOCAL_LOGS, JSON.stringify([...logs, row]));
+  },
+  async saveLogs(entries) {
+    const now = new Date().toISOString();
+    if (sb) { for (let i = 0; i < entries.length; i += 400) { const { error } = await sb.from('cycle_logs').upsert(entries.slice(i, i+400).map(e => ({ ...e, athlete_id: this.user.id, updated_at: now })), { onConflict: 'athlete_id,log_date' }); if (error) throw error; } return; }
+    const dates = new Set(entries.map(e => e.log_date));
+    const logs = (await this.loadLogs()).filter(l => !dates.has(l.log_date));
+    localStorage.setItem(LOCAL_LOGS, JSON.stringify([...logs, ...entries.map(e => ({ ...e, updated_at: now }))]));
+  },
+  async deleteLog(iso) {
+    if (sb) { const { error } = await sb.from('cycle_logs').delete().eq('log_date', iso); if (error) throw error; return; }
+    localStorage.setItem(LOCAL_LOGS, JSON.stringify((await this.loadLogs()).filter(l => l.log_date !== iso)));
+  },
+  async loadSettings() {
+    const def = { cycle_length: 28, period_length: 5 };
+    if (sb) { const { data } = await sb.from('athlete_settings').select('*').maybeSingle(); return { ...def, ...(data || {}) }; }
+    try { return { ...def, ...JSON.parse(localStorage.getItem(LOCAL_SETTINGS) || '{}') }; } catch (e) { return def; }
+  },
+  async saveSettings(s) {
+    if (sb) { const { error } = await sb.from('athlete_settings').upsert({ athlete_id: this.user.id, cycle_length: s.cycle_length, period_length: s.period_length }, { onConflict: 'athlete_id' }); if (error) throw error; return; }
+    localStorage.setItem(LOCAL_SETTINGS, JSON.stringify(s));
+  },
+  async coach(messages, context) {
+    if (!sb) return null;
+    const { data, error } = await sb.functions.invoke(CFG.COACH_FUNCTION, { body: { messages, context } });
+    if (error) throw error;
+    return data && data.reply;
+  },
+  athleteName() {
+    if (!sb) return CFG.LOCAL_NAME;
+    const u = this.user; const n = (u && u.user_metadata && u.user_metadata.name) || (u && u.email ? u.email.split('@')[0] : 'there');
+    return n.charAt(0).toUpperCase() + n.slice(1);
+  },
+};
+
+// ── Login ───────────────────────────────────────────────────────
+function Login() {
+  const [mode, setMode] = useState('in'); const [name, setName] = useState(''); const [email, setEmail] = useState(''); const [pw, setPw] = useState('');
+  const [busy, setBusy] = useState(false); const [msg, setMsg] = useState(null);
+  const field = { width:'100%', padding:'14px 15px', borderRadius:12, border:`1.5px solid ${M.ink100}`, background:M.bone, fontSize:15, color:M.ink, outline:'none', marginTop:10 };
+  const go = async () => {
+    setBusy(true); setMsg(null);
+    try {
+      if (mode === 'in') { const { error } = await sb.auth.signInWithPassword({ email: email.trim(), password: pw }); if (error) throw error; }
+      else { const { data, error } = await sb.auth.signUp({ email: email.trim(), password: pw, options: { data: { name: name.trim() } } }); if (error) throw error;
+             if (!data.session) setMsg({ ok:true, t:'Check your email to confirm, then sign in.' }); }
+    } catch (e) { setMsg({ ok:false, t:e.message }); }
+    setBusy(false);
+  };
+  const reset = async () => { if (!email.trim()) return setMsg({ ok:false, t:'Enter your email first.' }); const { error } = await sb.auth.resetPasswordForEmail(email.trim(), { redirectTo: location.href.split('#')[0] }); setMsg(error ? { ok:false, t:error.message } : { ok:true, t:'Reset link sent.' }); };
+  return <div style={{ maxWidth:480, margin:'0 auto', minHeight:'100vh', background:M.paper, padding:'calc(60px + env(safe-area-inset-top)) 24px 40px', display:'flex', flexDirection:'column', animation:'mFade .3s ease both' }}>
+    <div style={{ width:52, height:52, borderRadius:999, background:M.ink, display:'flex', alignItems:'center', justifyContent:'center', fontFamily:FONT.display, fontWeight:700, fontSize:26, color:M.paper }}>M</div>
+    <Label style={{ marginTop:28 }}>METHOD · Cycle</Label>
+    <Display size={30} style={{ marginTop:8 }}>{mode === 'in' ? 'Sign in' : 'Create your account'}</Display>
+    <div style={{ fontSize:14, color:M.ink500, marginTop:10, lineHeight:1.5 }}>Your logs are private to you and used only for your coaching — no one else sees them.</div>
+    <div style={{ marginTop:22 }}>
+      {mode === 'up' && <input value={name} onChange={e => setName(e.target.value)} placeholder="First name" autoComplete="given-name" style={field} />}
+      <input value={email} onChange={e => setEmail(e.target.value)} placeholder="Email" type="email" autoComplete="email" inputMode="email" style={field} />
+      <input value={pw} onChange={e => setPw(e.target.value)} onKeyDown={e => e.key === 'Enter' && go()} placeholder="Password" type="password" autoComplete={mode === 'in' ? 'current-password' : 'new-password'} style={field} />
+    </div>
+    {msg && <div style={{ marginTop:12, fontSize:13, color:msg.ok ? M.mint700 : M.coral }}>{msg.t}</div>}
+    <div style={{ marginTop:18 }}><MintBtn onClick={go} disabled={busy || !email || pw.length < 6}>{busy ? '…' : mode === 'in' ? 'Sign in' : 'Create account'}</MintBtn></div>
+    <div style={{ display:'flex', justifyContent:'space-between', marginTop:16 }}>
+      <button onClick={() => { setMode(mode === 'in' ? 'up' : 'in'); setMsg(null); }} style={{ background:'none', border:'none', fontSize:13, fontWeight:600, color:M.mint600, padding:0 }}>{mode === 'in' ? 'New here? Create account' : 'Have an account? Sign in'}</button>
+      {mode === 'in' && <button onClick={reset} style={{ background:'none', border:'none', fontSize:13, color:M.ink400, padding:0 }}>Forgot password</button>}
+    </div>
+    <div style={{ marginTop:'auto', paddingTop:30, fontSize:11, color:M.ink400, lineHeight:1.5 }}>Cycle data is health data. It's stored in METHOD's database, used only for your coaching, and you can delete it at any time from Settings.</div>
+  </div>;
+}
+
+// ── Visuals ─────────────────────────────────────────────────────
+function CycleRing({ model, size = 176 }) {
+  const r = (size - 14) / 2, c = 2 * Math.PI * r;
+  const { length, day, segs } = model;
+  let acc = 0;
+  const angle = day ? ((Math.min(day, length) - 0.5) / length) * 360 - 90 : null;
+  return <svg width={size} height={size} style={{ display:'block' }}>
+    <g style={{ transform:'rotate(-90deg)', transformOrigin:'center' }}>
+      {segs.map((s, i) => { const frac = (s.to - s.from + 1) / length; const dash = c * frac; const off = -acc * c; acc += frac;
+        const active = model.phase && model.phase.id === s.id;
+        return <circle key={i} cx={size/2} cy={size/2} r={r} fill="none" stroke={s.color} strokeWidth={active ? 12 : 8} strokeDasharray={`${Math.max(dash-3,0)} ${c-dash+3}`} strokeDashoffset={off} opacity={active || !model.phase ? 1 : 0.35} strokeLinecap="butt" />; })}
+    </g>
+    {angle != null && <circle cx={size/2 + r*Math.cos(angle*Math.PI/180)} cy={size/2 + r*Math.sin(angle*Math.PI/180)} r="6" fill={M.ink} stroke={M.paper} strokeWidth="2.5" />}
+    <text x="50%" y="46%" textAnchor="middle" fontFamily={FONT.display} fontWeight="700" fontSize={day ? 44 : 20} fill={M.ink} className="tnum">{day ? day : '—'}</text>
+    <text x="50%" y="62%" textAnchor="middle" fontFamily={FONT.mono} fontSize="9.5" letterSpacing="0.12em" fill={M.ink400}>{day ? `OF ~${length}` : 'NO PERIOD YET'}</text>
+  </svg>;
+}
+function FlowDots({ level, color = M.coral }) {
+  const n = level === 'heavy' ? 3 : level === 'medium' ? 2 : level === 'light' ? 1 : 0;
+  return <span style={{ display:'inline-flex', gap:3 }}>{[0,1,2].map(i => <span key={i} style={{ width:6, height:6, borderRadius:999, background:i < n ? color : M.ink100 }} />)}</span>;
+}
+function Scale({ value, onChange, lo = 'Low', hi = 'High' }) {
+  return <div>
+    <div style={{ display:'flex', gap:7 }}>{[1,2,3,4,5].map(n => <button key={n} onClick={() => onChange(value === n ? null : n)} className="press tnum" style={{ flex:1, padding:'11px 0', borderRadius:11, border:`1.5px solid ${value === n ? M.mint : M.ink100}`, background:value === n ? M.mint50 : M.bone, fontFamily:FONT.body, fontWeight:600, fontSize:14, color:value === n ? M.mint700 : M.ink500 }}>{n}</button>)}</div>
+    <div style={{ display:'flex', justifyContent:'space-between', marginTop:5 }}><Label size={8.5}>{lo}</Label><Label size={8.5}>{hi}</Label></div>
+  </div>;
+}
+
+// ── Log sheet ───────────────────────────────────────────────────
+function LogSheet({ date, existing, model, onClose, onSave, onDelete }) {
+  const [period, setPeriod] = useState(!!(existing && existing.period));
+  const [pStart, setPStart] = useState(!!(existing && existing.period_start));
+  const [pEnd, setPEnd] = useState(!!(existing && existing.period_end));
+  const [flow, setFlow] = useState((existing && existing.flow) || 'medium');
+  const [energy, setEnergy] = useState(existing ? existing.energy : null);
+  const [motivation, setMotivation] = useState(existing ? existing.motivation : null);
+  const [mood, setMood] = useState(existing ? existing.mood : null);
+  const [symptoms, setSymptoms] = useState((existing && existing.symptoms) || []);
+  const [note, setNote] = useState((existing && existing.note) || '');
+  const [busy, setBusy] = useState(false);
+  const toggle = id => setSymptoms(s => id === 'good' ? (s.includes('good') ? [] : ['good']) : (s.includes(id) ? s.filter(x => x !== id) : [...s.filter(x => x !== 'good'), id]));
+  const day = model.dayFor(date);
+  const save = async () => { setBusy(true); await onSave({ log_date: date, period, flow: period ? flow : null, period_start: period && pStart, period_end: period && pEnd, energy, motivation, mood, symptoms, note: note.trim() }); setBusy(false); };
+  return <div style={{ position:'fixed', inset:0, zIndex:80 }}>
+    <div onClick={onClose} style={{ position:'absolute', inset:0, background:'rgba(21,25,26,0.4)', animation:'mFade .2s ease both' }} />
+    <div className="noscroll" style={{ position:'absolute', left:0, right:0, bottom:0, maxHeight:'92%', overflowY:'auto', background:M.paper, borderRadius:'22px 22px 0 0', padding:'10px 20px calc(28px + env(safe-area-inset-bottom))', animation:'mRise .3s ease both', maxWidth:480, margin:'0 auto' }}>
+      <div style={{ width:38, height:4, borderRadius:999, background:M.ink200, margin:'0 auto 14px' }} />
+      <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between' }}>
+        <div><Label>{fmt(date)}{day ? ` · DAY ${day}` : ''}</Label><Display size={22} style={{ marginTop:5 }}>{date === TODAY ? 'Log today' : 'Log this day'}</Display></div>
+        <button onClick={onClose} className="press" style={{ width:34, height:34, borderRadius:999, background:M.ink100, border:'none', display:'flex', alignItems:'center', justifyContent:'center' }}><Icon name="close" size={15} /></button>
+      </div>
+
+      <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginTop:18, padding:'14px 15px', borderRadius:12, border:`1.5px solid ${period ? M.coral : M.ink100}`, background:period ? 'rgba(215,117,89,0.07)' : M.bone }}>
+        <div style={{ display:'flex', alignItems:'center', gap:10 }}><Icon name="cyclef" size={19} color={period ? M.coral : M.ink500} /><span style={{ fontWeight:600, fontSize:14.5 }}>Period</span></div>
+        <button onClick={() => setPeriod(p => !p)} className="press" style={{ width:46, height:28, borderRadius:999, border:'none', background:period ? M.coral : M.ink200, position:'relative', transition:'background .2s' }}><span style={{ position:'absolute', top:3, left:period ? 21 : 3, width:22, height:22, borderRadius:999, background:'#fff', boxShadow:'0 1px 4px rgba(21,25,26,0.2)', transition:'left .2s' }} /></button>
+      </div>
+      <div style={{ display:'flex', gap:8, marginTop:10 }}>
+        {[['start', 'Period started today', pStart, () => { setPStart(v => !v); if (!pStart) { setPeriod(true); } }], ['end', 'Period ended today', pEnd, () => { setPEnd(v => !v); if (!pEnd) { setPeriod(true); } }]].map(([k, label, on, toggle]) =>
+          <button key={k} onClick={toggle} className="press" style={{ flex:1, padding:'11px 10px', borderRadius:11, border:`1.5px solid ${on ? M.coral : M.ink100}`, background:on ? 'rgba(215,117,89,0.07)' : M.bone, fontSize:13, fontWeight:600, color:on ? M.ink : M.ink500, display:'flex', alignItems:'center', justifyContent:'center', gap:6 }}>
+            {on && <Icon name="complete" size={14} color={M.coral} />}{label}
+          </button>)}
+      </div>
+      {period && <div style={{ marginTop:12, animation:'mFade .25s ease both' }}><Label style={{ marginBottom:8 }}>Flow</Label>
+        <div style={{ display:'flex', gap:8 }}>{['light','medium','heavy'].map(f => <button key={f} onClick={() => setFlow(f)} className="press" style={{ flex:1, padding:'10px 6px', borderRadius:11, border:`1.5px solid ${flow === f ? M.coral : M.ink100}`, background:flow === f ? 'rgba(215,117,89,0.07)' : M.bone, display:'flex', flexDirection:'column', alignItems:'center', gap:6 }}><FlowDots level={f} /><span style={{ fontSize:12.5, fontWeight:600, color:flow === f ? M.ink : M.ink500, textTransform:'capitalize' }}>{f}</span></button>)}</div></div>}
+
+      <Label style={{ marginTop:18, marginBottom:8 }}>Energy</Label><Scale value={energy} onChange={setEnergy} lo="Empty" hi="Full" />
+      <Label style={{ marginTop:14, marginBottom:8 }}>Motivation to train</Label><Scale value={motivation} onChange={setMotivation} lo="Not today" hi="Up for it" />
+      <Label style={{ marginTop:14, marginBottom:8 }}>Mood</Label><Scale value={mood} onChange={setMood} lo="Low" hi="Good" />
+
+      <Label style={{ marginTop:18, marginBottom:8 }}>Anything physical</Label>
+      <div style={{ display:'flex', gap:8, flexWrap:'wrap' }}>{SYMPTOM_OPTS.map(o => { const on = symptoms.includes(o.id); return <button key={o.id} onClick={() => toggle(o.id)} className="press" style={{ padding:'9px 14px', borderRadius:999, border:`1.5px solid ${on ? M.mint : M.ink100}`, background:on ? M.mint50 : M.bone, fontSize:13, fontWeight:600, color:on ? M.mint700 : M.ink }}>{o.label}</button>; })}</div>
+
+      <Label style={{ marginTop:18, marginBottom:8 }}>In your words</Label>
+      <textarea value={note} onChange={e => setNote(e.target.value)} rows={2} placeholder="How training felt, sleep, anything worth noting…" style={{ width:'100%', resize:'none', padding:'12px 14px', borderRadius:11, border:`1.5px solid ${M.ink100}`, background:M.bone, fontSize:14, lineHeight:1.5, color:M.ink, outline:'none' }} />
+
+      <div style={{ marginTop:16 }}><MintBtn onClick={save} disabled={busy}>{busy ? 'Saving…' : 'Save log'}</MintBtn></div>
+      {existing && <button onClick={() => onDelete(date)} style={{ marginTop:10, width:'100%', background:'none', border:'none', fontSize:12.5, color:M.ink400, padding:8 }}>Delete this log</button>}
+    </div>
+  </div>;
+}
+
+// ── Today ───────────────────────────────────────────────────────
+function Today({ logs, model, settings, onLog, onSettings }) {
+  const todayLog = logs.find(l => l.log_date === TODAY);
+  const recent = logs.slice(-4).reverse();
+  const patterns = useMemo(() => buildPatterns(logs, model), [logs, model]);
+  const p = model.phase;
+  const nextIn = model.nextStart ? diffDays(model.nextStart, TODAY) : null;
+  return <div style={{ animation:'mFade .3s ease both' }}>
+    <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', paddingTop:4 }}>
+      <div><Label>{fmt(TODAY)}</Label><Display size={24} style={{ marginTop:4 }}>Cycle</Display></div>
+      <button onClick={onSettings} className="press" style={{ width:36, height:36, borderRadius:999, background:M.bone, border:`1px solid ${M.ink100}`, display:'flex', alignItems:'center', justifyContent:'center' }}><Icon name="settings" size={18} /></button>
+    </div>
+
+    <div style={{ display:'flex', flexDirection:'column', alignItems:'center', textAlign:'center', marginTop:22 }}>
+      <CycleRing model={model} />
+      <div style={{ display:'flex', alignItems:'center', gap:8, marginTop:18 }}>
+        <Display size={22}>{p ? `${p.name} phase` : 'Start tracking'}</Display>
+        {p && <Pill tone={p.id === 'menstrual' ? 'coral' : p.id === 'ovulation' ? 'amber' : p.id === 'luteal' ? 'slate' : 'mint'}>{model.overdue ? 'PAST EST.' : p.sub.toUpperCase()}</Pill>}
+      </div>
+      <div style={{ fontSize:14, lineHeight:1.55, color:M.ink500, marginTop:10, maxWidth:300 }}>
+        {!p ? 'Log the first day of your next period and the ring starts from there. Everything else — energy, mood, motivation — can be logged any day.'
+          : model.overdue ? `Day ${model.day} is past your usual ~${model.length}. Nothing to read into on its own — log when your period starts and the count resets.`
+          : 'The ring shows where you are. How you actually feel is what we track — log it and your own pattern builds over time.'}
+      </div>
+      <div style={{ width:'100%', marginTop:18 }}><MintBtn onClick={() => onLog(TODAY)}>{todayLog ? 'Edit today’s log' : 'Log today'}</MintBtn></div>
+    </div>
+
+    <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:12, marginTop:22 }}>
+      <Card pad={14}><Label size={9}>Next period</Label><div className="tnum" style={{ fontFamily:FONT.display, fontWeight:700, fontSize:24, marginTop:8 }}>{nextIn == null ? '—' : nextIn < 0 ? 'Due' : `${nextIn}d`}</div><div style={{ fontSize:12, color:M.ink400, marginTop:3 }}>{model.nextStart ? `Est. ${fmtShort(model.nextStart)}` : 'Needs a logged period'}</div></Card>
+      <Card pad={14}><Label size={9}>Cycle length</Label><div className="tnum" style={{ fontFamily:FONT.display, fontWeight:700, fontSize:24, marginTop:8 }}>~{model.length}</div><div style={{ fontSize:12, color:M.ink400, marginTop:3 }}>{model.estimated ? `From ${model.starts.length} logged starts` : 'Default until learned'}</div></Card>
+    </div>
+
+    <SectionHead label="Your patterns" />
+    <Card>
+      {patterns.length === 0
+        ? <div style={{ fontSize:13, lineHeight:1.5, color:M.ink400 }}>Nothing to say yet. Patterns show once you've got a few logs in each phase — they're built from your entries, never assumed from the calendar.</div>
+        : patterns.map((x, i) => <div key={i} style={{ display:'flex', alignItems:'flex-start', gap:9, marginTop:i ? 9 : 0 }}><span style={{ width:8, height:8, borderRadius:2, background:x.color, flexShrink:0, marginTop:5 }} /><span style={{ fontSize:13, lineHeight:1.45, color:M.ink500 }}>{x.t}</span></div>)}
+    </Card>
+
+    <SectionHead label="Recent logs" />
+    <Card pad={0}>
+      {recent.length === 0 && <div style={{ padding:16, fontSize:13, color:M.ink400 }}>No logs yet.</div>}
+      {recent.map((l, i) => <LogRow key={l.log_date} l={l} model={model} first={i === 0} onClick={() => onLog(l.log_date)} />)}
+    </Card>
+    <div style={{ height:24 }} />
+  </div>;
+}
+function LogRow({ l, model, first, onClick }) {
+  const d = model.dayFor(l.log_date);
+  const bits = [l.period && `Period${l.period_start ? ' start' : l.period_end ? ' end' : ''}${l.flow ? ' · ' + l.flow : ''}`, l.energy && `Energy ${l.energy}`, l.motivation && `Motiv. ${l.motivation}`, ...(l.symptoms||[]).map(s => SYMPTOM_LABEL[s] || s)].filter(Boolean);
+  return <div onClick={onClick} className="press" style={{ display:'flex', alignItems:'center', gap:10, padding:'12px 14px', borderTop:first ? 'none' : `1px solid ${M.ink100}` }}>
+    <div style={{ width:70, flexShrink:0 }}><div style={{ fontFamily:FONT.mono, fontSize:9.5, letterSpacing:'0.06em', color:M.ink400 }}>{fmt(l.log_date)}</div>{d && <div style={{ fontFamily:FONT.mono, fontSize:9, color:M.ink300, marginTop:2 }}>DAY {d}</div>}</div>
+    {l.period ? <FlowDots level={l.flow} /> : <span style={{ width:24 }} />}
+    <div style={{ flex:1, minWidth:0 }}><div style={{ fontSize:12.5, whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis' }}>{bits.join(' · ') || '—'}</div>{l.note && <div style={{ fontSize:12, color:M.ink400, marginTop:2, whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis' }}>{l.note}</div>}</div>
+    <Icon name="chevron" size={14} color={M.ink300} />
+  </div>;
+}
+
+// ── History (month grid + list) ─────────────────────────────────
+function History({ logs, model, onLog }) {
+  const [month, setMonth] = useState(() => { const d = new Date(); return new Date(d.getFullYear(), d.getMonth(), 1); });
+  const byDate = Object.fromEntries(logs.map(l => [l.log_date, l]));
+  const first = new Date(month.getFullYear(), month.getMonth(), 1);
+  const offset = (first.getDay() + 6) % 7;
+  const days = new Date(month.getFullYear(), month.getMonth()+1, 0).getDate();
+  const cells = [...Array(offset).fill(null), ...Array.from({ length: days }, (_, i) => isoLocal(new Date(month.getFullYear(), month.getMonth(), i+1)))];
+  const monthLogs = logs.filter(l => l.log_date.startsWith(`${month.getFullYear()}-${pad2(month.getMonth()+1)}`)).reverse();
+  return <div style={{ animation:'mFade .3s ease both' }}>
+    <div style={{ paddingTop:4 }}><Label>Calendar</Label><Display size={24} style={{ marginTop:4 }}>{month.toLocaleDateString('en-GB', { month:'long', year:'numeric' })}</Display></div>
+    <div style={{ display:'flex', gap:8, marginTop:14 }}>
+      <GhostBtn onClick={() => setMonth(new Date(month.getFullYear(), month.getMonth()-1, 1))} style={{ padding:'8px 12px' }}><Icon name="chevL" size={16} /></GhostBtn>
+      <GhostBtn onClick={() => setMonth(new Date(month.getFullYear(), month.getMonth()+1, 1))} style={{ padding:'8px 12px' }}><Icon name="chevron" size={16} /></GhostBtn>
+    </div>
+    <Card pad={12} style={{ marginTop:14 }}>
+      <div style={{ display:'grid', gridTemplateColumns:'repeat(7,1fr)', gap:4 }}>
+        {['M','T','W','T','F','S','S'].map((d, i) => <div key={i} style={{ textAlign:'center', fontFamily:FONT.mono, fontSize:9, color:M.ink400, paddingBottom:4 }}>{d}</div>)}
+        {cells.map((iso, i) => {
+          if (!iso) return <div key={i} />;
+          const l = byDate[iso]; const future = iso > TODAY; const d = model.dayFor(iso); const ph = model.phaseOf(d);
+          const pred = model.predictFor(iso);
+          const bg = l && l.period ? M.coral : l ? M.mint100 : pred === 'period' ? 'rgba(215,117,89,0.14)' : pred === 'ovulation' ? 'rgba(224,162,74,0.18)' : 'transparent';
+          const border = iso === TODAY ? `1.5px solid ${M.ink}` : pred === 'period' ? `1.5px dashed ${M.coral}` : pred === 'ovulation' ? `1.5px dashed ${M.amber}` : '1px solid transparent';
+          return <button key={i} disabled={future} onClick={() => onLog(iso)} className="press tnum" style={{ aspectRatio:'1', borderRadius:9, border, background:bg, fontSize:12.5, fontWeight:l ? 600 : 400, color:future ? (pred ? M.ink500 : M.ink200) : l && l.period ? '#fff' : M.ink, position:'relative' }}>
+            {parseInt(iso.slice(8))}
+            {ph && !future && <span style={{ position:'absolute', bottom:3, left:'50%', transform:'translateX(-50%)', width:4, height:4, borderRadius:999, background:ph.color, opacity:l && l.period ? 0 : .8 }} />}
+          </button>;
+        })}
+      </div>
+      <div style={{ display:'flex', gap:12, marginTop:12, flexWrap:'wrap' }}>{PHASES.map(p => <span key={p.id} style={{ display:'inline-flex', alignItems:'center', gap:5, fontFamily:FONT.mono, fontSize:8.5, letterSpacing:'0.08em', color:M.ink400 }}><span style={{ width:6, height:6, borderRadius:999, background:p.color }} />{p.name.toUpperCase()}</span>)}
+        <span style={{ display:'inline-flex', alignItems:'center', gap:5, fontFamily:FONT.mono, fontSize:8.5, letterSpacing:'0.08em', color:M.ink400 }}><span style={{ width:9, height:9, borderRadius:3, border:`1.5px dashed ${M.coral}`, background:'rgba(215,117,89,0.14)' }} />PREDICTED</span>
+      </div>
+    </Card>
+    {(() => {
+      const ym = `${month.getFullYear()}-${pad2(month.getMonth()+1)}`;
+      const inMonth = model.predicted.filter(c => (c.start > TODAY && c.start.startsWith(ym)) || (c.ov > TODAY && c.ov.startsWith(ym)));
+      if (!inMonth.length) return null;
+      return <><SectionHead label="Predicted" /><Card pad={14}>
+        {inMonth.map((c, i) => <div key={i} style={{ marginTop:i ? 10 : 0 }}>
+          {c.start > TODAY && c.start.startsWith(ym) && <div style={{ display:'flex', alignItems:'center', gap:8, fontSize:13 }}><span style={{ width:8, height:8, borderRadius:2, background:M.coral }} />Period around <b style={{ marginLeft:4 }}>{fmtShort(c.start)}</b><span style={{ color:M.ink400 }}>· {diffDays(c.start, TODAY) === 1 ? 'tomorrow' : `${diffDays(c.start, TODAY)} days away`}</span></div>}
+          {c.ov > TODAY && c.ov.startsWith(ym) && <div style={{ display:'flex', alignItems:'center', gap:8, fontSize:13, marginTop:c.start > TODAY && c.start.startsWith(ym) ? 6 : 0 }}><span style={{ width:8, height:8, borderRadius:2, background:M.amber }} />Ovulation around <b style={{ marginLeft:4 }}>{fmtShort(c.ov)}</b><span style={{ color:M.ink400 }}>· {diffDays(c.ov, TODAY) === 1 ? 'tomorrow' : `${diffDays(c.ov, TODAY)} days away`}</span></div>}
+        </div>)}
+        <div style={{ fontSize:11.5, color:M.ink400, marginTop:10, lineHeight:1.45 }}>Estimates from your last period start and a ~{model.length}-day cycle. They'll be wrong sometimes — each period you log makes the next one closer.</div>
+      </Card></>;
+    })()}
+    <SectionHead label={`${monthLogs.length} logs this month`} />
+    <Card pad={0}>{monthLogs.length === 0 ? <div style={{ padding:16, fontSize:13, color:M.ink400 }}>Tap a past day above to add one.</div> : monthLogs.map((l, i) => <LogRow key={l.log_date} l={l} model={model} first={i === 0} onClick={() => onLog(l.log_date)} />)}</Card>
+    <div style={{ height:24 }} />
+  </div>;
+}
+
+// ── Coach chat (guardrails live in the Edge Function; this fallback mirrors them) ──
+function offlineReply(q, model, logs) {
+  const s = q.toLowerCase();
+  const ph = model.phase ? model.phase.name.toLowerCase() : null;
+  if (/(pain|hurt|injur|bleed|clot|dizzy|faint|doctor|gp|pill|contracept|pregnan|fertil|medic|ibuprofen|paracetamol)/.test(s))
+    return `Sorry you're dealing with that. The right person for anything medical is your GP or a specialist — that's outside what I cover. From my side, I can adjust training to fit around it: easier days, a shorter week, or a swap. Tell me what would help.`;
+  if (/(tired|flat|low|heavy|can.?t be bothered|unmotivat|no energy)/.test(s))
+    return `Noted. Low motivation and low capacity aren't the same thing — some athletes find the legs are fine once they're ten minutes in. If you want, start easy and judge at the first effort. And if you'd rather rest, that's the call, no questions.`;
+  if (/(phase|cycle|day|period|where am i|luteal|follicular|ovulat)/.test(s))
+    return ph ? `You're on day ${model.day}, which the calendar puts in your ${ph} phase. That's timing, not a verdict on how you feel — your logs are what I go by. Anything you've noticed this week?` : `No period logged yet, so I can't place you on the ring. Log the first day when it comes and we'll build from there.`;
+  if (/(pattern|notice|usual|normally|tend)/.test(s)) {
+    const ps = buildPatterns(logs, model); return ps.length ? `From your own logs: ${ps[0].t} Does that match how it feels to you?` : `Not enough logs yet to say anything honest. A few entries in each phase and I'll reflect back what you've actually recorded.`;
+  }
+  if (/(strong|good|great|best|test|race|hard session|intervals)/.test(s))
+    return `Good. If this is a window where you've felt strong before, it's a reasonable time to hit a key session or test yourself. Your plan is set from here — flag it and we'll build it in.`;
+  return `Got it. I track how you feel over time and reflect your own pattern back — I don't decide how you should feel from the calendar. Log today if you haven't, and ask me anything about training around it.`;
+}
+function Coach({ logs, model }) {
+  const greet = `Morning, ${store.athleteName()}. How can I help with training this week?`;
+  const CHAT_KEY = 'method_chat_' + ((store.user && store.user.id) || 'local');
+  const [msgs, setMsgsRaw] = useState(() => { try { const s = JSON.parse(localStorage.getItem(CHAT_KEY) || 'null'); return Array.isArray(s) && s.length ? s : [{ role:'coach', text: greet }]; } catch (e) { return [{ role:'coach', text: greet }]; } });
+  const setMsgs = m => { setMsgsRaw(m); try { localStorage.setItem(CHAT_KEY, JSON.stringify(m.filter(x => x.text !== '__typing__').slice(-60))); } catch (e) {} };
+  const clearChat = () => { if (confirm('Clear this conversation?')) setMsgs([{ role:'coach', text: greet }]); };
+  const [input, setInput] = useState(''); const [busy, setBusy] = useState(false); const ref = useRef(null);
+  const [live, setLive] = useState(null); const [liveErr, setLiveErr] = useState(null);
+  useEffect(() => { if (ref.current) ref.current.scrollTop = ref.current.scrollHeight; }, [msgs]);
+  const send = async text => {
+    const q = (text != null ? text : input).trim(); if (!q || busy) return;
+    setInput(''); setBusy(true);
+    const history = [...msgs, { role:'user', text:q }];
+    setMsgs([...history, { role:'coach', text:'__typing__' }]);
+    let reply = '';
+    try {
+      const ctx = { today: TODAY, athlete: store.athleteName(), coach: CFG.COACH_NAME, cycle_day: model.day, phase: model.phase ? model.phase.name : null, cycle_length: model.length, period_length: model.periodLen, last_period_start: model.lastStart, next_period_estimate: model.nextStart, next_period_in_days: model.nextStart ? diffDays(model.nextStart, TODAY) : null, next_ovulation_estimate: (model.predicted.find(c => c.ov > TODAY) || {}).ov || null, cycle_length_source: model.estimated ? `average of ${model.starts.length} logged starts` : 'default, not yet learned', recent_logs: logs.slice(-10).map(l => ({ date:l.log_date, period:l.period, flow:l.flow, energy:l.energy, motivation:l.motivation, mood:l.mood, symptoms:l.symptoms, note:l.note })), patterns: buildPatterns(logs, model).map(p => p.t) };
+      reply = await store.coach(history.map(m => ({ role: m.role === 'user' ? 'user' : 'assistant', content: m.text })), ctx);
+      setLive(!!reply); setLiveErr(reply ? null : 'Function returned no reply (API key missing?)');
+    } catch (e) { reply = ''; setLive(false); setLiveErr(e.message || String(e)); }
+    if (!reply) { await new Promise(r => setTimeout(r, 600)); reply = offlineReply(q, model, logs); }
+    setMsgs([...history, { role:'coach', text:reply }]); setBusy(false);
+  };
+  const SUGG = ['Where am I in my cycle?', 'I feel flat today', 'What patterns have you seen?'];
+  return <div style={{ display:'flex', flexDirection:'column', height:'calc(100vh - 150px)', animation:'mFade .3s ease both' }}>
+    <div style={{ paddingTop:4, display:'flex', alignItems:'center', justifyContent:'space-between' }}>
+      <div><Label>Coach</Label><Display size={24} style={{ marginTop:4 }}>M.</Display></div>
+      <div style={{ display:'flex', alignItems:'center', gap:12 }}>
+      {msgs.length > 1 && <button onClick={clearChat} style={{ background:'none', border:'none', fontFamily:FONT.mono, fontSize:9, letterSpacing:'0.08em', color:M.ink400, padding:0 }}>CLEAR</button>}
+      <span style={{ display:'inline-flex', alignItems:'center', gap:5, fontFamily:FONT.mono, fontSize:9, letterSpacing:'0.08em', color:M.ink400 }}><Icon name="shield" size={12} color={live ? M.mint600 : M.ink300} />{live === true ? 'AI · GUARDED' : live === false ? 'OFFLINE · CANNED' : sb ? 'READY' : 'OFFLINE DEMO'}</span>
+      </div>
+    </div>
+    <div ref={ref} className="noscroll" style={{ flex:1, overflowY:'auto', display:'flex', flexDirection:'column', gap:10, marginTop:16, paddingBottom:10 }}>
+      {msgs.map((m, i) => { const c = m.role === 'coach'; return <div key={i} style={{ display:'flex', justifyContent:c ? 'flex-start' : 'flex-end', animation:'mFade .3s ease both' }}>
+        <div style={{ maxWidth:'84%', background:c ? M.bone : M.ink, color:c ? M.ink : M.paper, border:c ? `1px solid ${M.ink100}` : 'none', borderRadius:16, borderBottomLeftRadius:c ? 4 : 16, borderBottomRightRadius:c ? 16 : 4, padding:'11px 14px', fontSize:14, lineHeight:1.5 }}>
+          {m.text === '__typing__' ? <div style={{ display:'flex', gap:4, padding:'4px 2px' }}>{[0,1,2].map(j => <span key={j} style={{ width:6, height:6, borderRadius:999, background:M.ink300, animation:`mBlink 1.2s ${j*0.18}s infinite` }} />)}</div> : m.text}
+        </div></div>; })}
+    </div>
+    {msgs.length < 3 && <div className="noscroll" style={{ display:'flex', gap:8, overflowX:'auto', paddingBottom:10 }}>{SUGG.map(s => <button key={s} onClick={() => send(s)} className="press" style={{ whiteSpace:'nowrap', padding:'8px 13px', borderRadius:999, border:`1.5px solid ${M.ink100}`, background:M.bone, fontSize:12.5, fontWeight:600 }}>{s}</button>)}</div>}
+    <div style={{ display:'flex', gap:8, alignItems:'center' }}>
+      <input value={input} onChange={e => setInput(e.target.value)} onKeyDown={e => e.key === 'Enter' && send()} placeholder="Ask about training around your cycle…" style={{ flex:1, padding:'13px 15px', borderRadius:999, border:`1.5px solid ${M.ink100}`, background:M.bone, fontSize:14, outline:'none' }} />
+      <button onClick={() => send()} className="press" style={{ width:44, height:44, borderRadius:999, border:'none', background:M.ink, display:'flex', alignItems:'center', justifyContent:'center' }}><Icon name="send" size={17} color={M.mint} /></button>
+    </div>
+    <div style={{ fontSize:10.5, color:M.ink400, marginTop:8, lineHeight:1.4 }}>M. coaches training only. For anything medical, your GP.{liveErr && <span style={{ color:M.coral }}> · AI unavailable: {liveErr}</span>}</div>
+  </div>;
+}
+
+// ── Settings ────────────────────────────────────────────────────
+// ── Import from other trackers (Clue, Flo, Natural Cycles, Apple Health, Garmin…) ──
+// Sniffs the file rather than hardcoding one app: finds a date field and a period/flow field.
+const FLOW_WORDS = { spotting:'light', light:'light', low:'light', medium:'medium', moderate:'medium', normal:'medium', heavy:'heavy', high:'heavy', super:'heavy', 'very heavy':'heavy' };
+function normFlow(v) {
+  if (v == null) return null; if (v === true) return 'medium';
+  const t = String(v).toLowerCase().replace(/hkcategoryvaluemenstrualflow/, '').trim();
+  if (['', 'false', 'no', 'none', '0', 'null', 'unspecified'].includes(t)) return t === 'unspecified' ? 'medium' : null;
+  for (const k in FLOW_WORDS) if (t.includes(k)) return FLOW_WORDS[k];
+  if (/^\d+$/.test(t)) { const n = +t; return n <= 0 ? null : n === 1 ? 'light' : n === 2 ? 'medium' : 'heavy'; }
+  if (['true', 'yes', 'period', 'menstruation', 'bleeding'].some(w => t.includes(w))) return 'medium';
+  return null;
+}
+function normDate(v) {
+  if (v == null) return null; const t = String(v).trim();
+  let m = t.match(/^(\d{4})-(\d{2})-(\d{2})/); if (m) return `${m[1]}-${m[2]}-${m[3]}`;
+  m = t.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})/); if (m) return `${m[3]}-${pad2(m[2])}-${pad2(m[1])}`;   // UK d/m/y
+  m = t.match(/^(\d{4})(\d{2})(\d{2})$/); if (m) return `${m[1]}-${m[2]}-${m[3]}`;
+  const d = new Date(t); return isNaN(d) ? null : isoLocal(d);
+}
+const DATE_KEYS = /^(date|day|log_date|start_?date|startdate|timestamp|time|created|recorded|when)$/i;
+const FLOW_KEYS = /(period|flow|menstru|bleed)/i;
+const SYMPTOM_MAP = [[/cramp/i,'cramps'],[/headache|migraine/i,'headache'],[/bloat/i,'bloating'],[/fatigue|tired|exhaust|low.?energy/i,'fatigue'],[/sleep/i,'sleep'],[/flat|unmotiv|low.?mood|sad/i,'flat']];
+function rowsToLogs(rows) {
+  if (!rows.length) return [];
+  const keys = Object.keys(rows[0]);
+  const dateKey = keys.find(k => DATE_KEYS.test(k)) || keys.find(k => rows.slice(0, 20).every(r => normDate(r[k])));
+  const flowKeys = keys.filter(k => FLOW_KEYS.test(k) && k !== dateKey);
+  if (!dateKey) throw new Error('No date column found.');
+  const byDate = {};
+  rows.forEach(r => {
+    const d = normDate(r[dateKey]); if (!d || d > TODAY) return;
+    const e = byDate[d] || (byDate[d] = { log_date: d, period: false, flow: null, period_start: false, period_end: false, symptoms: [], note: '' });
+    for (const k of flowKeys) { const f = normFlow(r[k]); if (f) { e.period = true; e.flow = f; } }
+    for (const k of keys) { if (k === dateKey || flowKeys.includes(k)) continue; const v = r[k]; if (v == null || v === '' || v === false) continue;
+      const text = `${k} ${typeof v === 'object' ? JSON.stringify(v) : v}`;
+      SYMPTOM_MAP.forEach(([re, id]) => { if (re.test(text) && !e.symptoms.includes(id)) e.symptoms.push(id); });
+      if (/^(note|notes|comment|memo)$/i.test(k)) e.note = String(v).slice(0, 300); }
+  });
+  return Object.values(byDate).filter(e => e.period || e.symptoms.length || e.note);
+}
+function parseCSV(text) {
+  const lines = text.replace(/\r/g, '').split('\n').filter(l => l.trim());
+  const sep = (lines[0].match(/;/g) || []).length > (lines[0].match(/,/g) || []).length ? ';' : ',';
+  const split = l => { const out = []; let cur = '', q = false; for (const ch of l) { if (ch === '"') q = !q; else if (ch === sep && !q) { out.push(cur); cur = ''; } else cur += ch; } out.push(cur); return out.map(x => x.trim()); };
+  const head = split(lines[0]);
+  return lines.slice(1).map(l => Object.fromEntries(split(l).map((v, i) => [head[i] || `c${i}`, v])));
+}
+function findRows(obj, depth = 0) {   // deepest-first search for an array of objects with a date-ish key
+  if (depth > 6 || obj == null) return null;
+  if (Array.isArray(obj)) { if (obj.length && typeof obj[0] === 'object' && Object.keys(obj[0]).some(k => DATE_KEYS.test(k))) return obj; for (const x of obj) { const r = findRows(x, depth+1); if (r) return r; } return null; }
+  if (typeof obj === 'object') { for (const k of Object.keys(obj)) { const r = findRows(obj[k], depth+1); if (r) return r; } }
+  return null;
+}
+function parseAppleHealth(xml) {
+  const rows = []; const re = /<Record[^>]*type="HKCategoryTypeIdentifierMenstrualFlow"[^>]*>/g; let m;
+  while ((m = re.exec(xml))) { const v = (m[0].match(/ value="([^"]+)"/) || [])[1]; const d = (m[0].match(/ startDate="([^"]+)"/) || [])[1]; if (d) rows.push({ date: d, flow: v }); }
+  return rows;
+}
+function parseImport(text, name) {
+  const t = text.trim();
+  if (/HKCategoryTypeIdentifierMenstrualFlow/.test(t)) return rowsToLogs(parseAppleHealth(t));
+  if (t[0] === '{' || t[0] === '[') { const rows = findRows(JSON.parse(t)); if (!rows) throw new Error('No daily records found in this JSON.'); return rowsToLogs(rows); }
+  if (/\.(csv|txt|tsv)$/i.test(name) || t.includes(',') || t.includes(';')) return rowsToLogs(parseCSV(t));
+  throw new Error('Unrecognised file. Export as CSV or JSON from your tracker.');
+}
+function ImportPanel({ logs, onDone }) {
+  const [state, setState] = useState({ step:'idle' });
+  const pick = async e => {
+    const f = e.target.files[0]; if (!f) return;
+    try { const text = await f.text(); const parsed = parseImport(text, f.name);
+      const have = new Set(logs.map(l => l.log_date));
+      const merged = parsed.map(p => { const ex = logs.find(l => l.log_date === p.log_date); return ex ? { ...ex, period: ex.period || p.period, flow: ex.flow || p.flow, symptoms: [...new Set([...(ex.symptoms||[]), ...p.symptoms])], note: ex.note || p.note } : p; });
+      const dates = merged.map(m => m.log_date).sort();
+      setState({ step:'preview', rows: merged, n: merged.length, periods: merged.filter(m => m.period).length, from: dates[0], to: dates[dates.length-1], newDays: merged.filter(m => !have.has(m.log_date)).length });
+    } catch (err) { setState({ step:'error', msg: err.message }); }
+    e.target.value = '';
+  };
+  const commit = async () => { setState(s => ({ ...s, step:'saving' })); try { await store.saveLogs(state.rows); setState({ step:'done', n: state.n }); onDone(); } catch (err) { setState({ step:'error', msg: err.message }); } };
+  return <div style={{ paddingTop:14, borderTop:`1px solid ${M.ink100}` }}>
+    <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between' }}>
+      <div><div style={{ fontSize:14.5, fontWeight:600 }}>Import from another app</div><div style={{ fontSize:12, color:M.ink400, marginTop:2 }}>Clue, Flo, Natural Cycles, Apple Health, Garmin — CSV, JSON or export.xml</div></div>
+      <label className="press" style={{ padding:'10px 14px', borderRadius:12, border:`1.5px solid ${M.ink100}`, background:M.bone, fontSize:13, fontWeight:600, cursor:'pointer', flexShrink:0 }}>Choose file<input type="file" accept=".csv,.json,.txt,.xml,.tsv" onChange={pick} style={{ display:'none' }} /></label>
+    </div>
+    {state.step === 'preview' && <div style={{ marginTop:12, padding:'12px 14px', borderRadius:12, background:M.mint50, border:`1px solid ${M.mint200}` }}>
+      <div style={{ fontSize:13, lineHeight:1.5 }}>Found <b>{state.n} days</b> ({state.periods} period days) from {fmtShort(state.from)} to {fmtShort(state.to)}. {state.newDays} new, {state.n - state.newDays} merged into days you've already logged — your own entries are kept.</div>
+      <div style={{ display:'flex', gap:8, marginTop:10 }}><MintBtn onClick={commit} style={{ padding:'11px' }}>Import {state.n} days</MintBtn><GhostBtn onClick={() => setState({ step:'idle' })}>Cancel</GhostBtn></div>
+    </div>}
+    {state.step === 'saving' && <div style={{ marginTop:10, fontSize:13, color:M.ink400 }}>Saving…</div>}
+    {state.step === 'done' && <div style={{ marginTop:10, fontSize:13, color:M.mint700 }}>Imported {state.n} days. Your ring and cycle length now use the full history.</div>}
+    {state.step === 'error' && <div style={{ marginTop:10, fontSize:13, color:M.coral }}>{state.msg}</div>}
+  </div>;
+}
+
+function Settings({ settings, onSave, onClose, logs, onImported }) {
+  const [len, setLen] = useState(settings.cycle_length); const [pl, setPl] = useState(settings.period_length);
+  const Row = ({ label, v, set, min, max }) => <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', padding:'14px 0', borderTop:`1px solid ${M.ink100}` }}><span style={{ fontSize:14.5, fontWeight:600 }}>{label}</span><div style={{ display:'flex', alignItems:'center', gap:10 }}><GhostBtn onClick={() => set(Math.max(min, v-1))} style={{ padding:'6px 12px' }}>−</GhostBtn><span className="tnum" style={{ fontFamily:FONT.display, fontWeight:700, fontSize:20, width:28, textAlign:'center' }}>{v}</span><GhostBtn onClick={() => set(Math.min(max, v+1))} style={{ padding:'6px 12px' }}>+</GhostBtn></div></div>;
+  return <div style={{ position:'fixed', inset:0, zIndex:80 }}>
+    <div onClick={onClose} style={{ position:'absolute', inset:0, background:'rgba(21,25,26,0.4)', animation:'mFade .2s ease both' }} />
+    <div className="noscroll" style={{ position:'absolute', left:0, right:0, bottom:0, maxHeight:'92%', overflowY:'auto', background:M.paper, borderRadius:'22px 22px 0 0', padding:'10px 20px calc(28px + env(safe-area-inset-bottom))', animation:'mRise .3s ease both', maxWidth:480, margin:'0 auto' }}>
+      <div style={{ width:38, height:4, borderRadius:999, background:M.ink200, margin:'0 auto 14px' }} />
+      <Display size={22}>Settings</Display>
+      <div style={{ fontSize:12.5, color:M.ink400, marginTop:6, marginBottom:12 }}>Defaults only — once you've logged two period starts, the app uses your own cycle length instead.</div>
+      <Row label="Usual cycle length" v={len} set={setLen} min={20} max={45} /><Row label="Usual period length" v={pl} set={setPl} min={2} max={10} />
+      <ImportPanel logs={logs} onDone={onImported} />
+      <div style={{ fontFamily:FONT.mono, fontSize:9, color:M.ink300, marginTop:14, letterSpacing:'0.06em' }}>{store.mode === 'supabase' ? `SIGNED IN · ${(store.user && store.user.email) || ''}` : 'LOCAL · THIS PHONE ONLY'}</div>
+      <div style={{ marginTop:14 }}><MintBtn onClick={() => onSave({ cycle_length:len, period_length:pl })}>Save</MintBtn></div>
+      {sb && <div style={{ display:'flex', gap:8, marginTop:10 }}>
+        <GhostBtn onClick={() => { try { Object.keys(localStorage).filter(k => k.startsWith('method_chat_')).forEach(k => localStorage.removeItem(k)); } catch (e) {} sb.auth.signOut(); }} style={{ flex:1 }}>Sign out</GhostBtn>
+        <GhostBtn onClick={async () => { if (confirm('Delete every log and your settings? This cannot be undone.')) { await sb.from('cycle_logs').delete().neq('log_date', '1900-01-01'); await sb.from('athlete_settings').delete().neq('cycle_length', -1); await sb.auth.signOut(); } }} style={{ flex:1, color:M.coral }}>Delete my data</GhostBtn>
+      </div>}
+    </div>
+  </div>;
+}
+
+// ── App shell ───────────────────────────────────────────────────
+function App() {
+  const [tab, setTab] = useState('today'); const [logs, setLogs] = useState([]); const [settings, setSettings] = useState({ cycle_length:28, period_length:5 });
+  const [logDate, setLogDate] = useState(null); const [showSettings, setShowSettings] = useState(false); const [err, setErr] = useState(null); const [ready, setReady] = useState(false);
+  const [auth, setAuth] = useState(sb ? 'checking' : 'local');
+  const refresh = async () => { try { const [l, s] = await Promise.all([store.loadLogs(), store.loadSettings()]); setLogs(l); setSettings(s); setErr(null); } catch (e) { setErr(e.message || String(e)); } setReady(true); };
+  useEffect(() => {
+    if (!sb) { refresh(); return; }
+    const apply = session => { store.user = session ? session.user : null; if (session) { setAuth('in'); setReady(false); refresh(); } else { setAuth('out'); setLogs([]); setTab('today'); } };
+    sb.auth.getSession().then(({ data }) => apply(data.session));
+    const { data: sub } = sb.auth.onAuthStateChange((_e, session) => apply(session));
+    return () => sub.subscription.unsubscribe();
+  }, []);
+  const model = useMemo(() => cycleModel(logs, settings), [logs, settings]);
+  if (auth === 'checking') return <div style={{ minHeight:'100vh', background:M.paper }} />;
+  if (auth === 'out') return <Login />;
+  const save = async entry => { try { await store.saveLog(entry); setLogDate(null); await refresh(); } catch (e) { setErr(e.message || String(e)); } };
+  const del = async iso => { try { await store.deleteLog(iso); setLogDate(null); await refresh(); } catch (e) { setErr(e.message || String(e)); } };
+  const TABS = [['today','Today','cyclef'],['history','Calendar','calendar'],['coach','Coach','chat']];
+  return <div style={{ maxWidth:480, margin:'0 auto', minHeight:'100vh', background:M.paper, position:'relative' }}>
+    <div className="noscroll" style={{ padding:'calc(14px + env(safe-area-inset-top)) 20px 100px' }}>
+      {err && <div style={{ background:'rgba(215,117,89,0.12)', border:`1px solid ${M.coral}`, borderRadius:12, padding:'10px 12px', fontSize:12.5, color:M.ink, marginBottom:12 }}>Couldn't reach storage: {err}</div>}
+      {!ready ? <div style={{ padding:'60px 0', textAlign:'center', fontFamily:FONT.mono, fontSize:10, letterSpacing:'0.12em', color:M.ink400 }}>LOADING</div>
+        : tab === 'today' ? <Today logs={logs} model={model} settings={settings} onLog={setLogDate} onSettings={() => setShowSettings(true)} />
+        : tab === 'history' ? <History logs={logs} model={model} onLog={setLogDate} />
+        : <Coach logs={logs} model={model} />}
+    </div>
+    <div style={{ position:'fixed', left:0, right:0, bottom:0, maxWidth:480, margin:'0 auto', background:'rgba(245,240,232,0.92)', backdropFilter:'blur(14px)', WebkitBackdropFilter:'blur(14px)', borderTop:`1px solid ${M.ink100}`, display:'flex', padding:'8px 12px calc(10px + env(safe-area-inset-bottom))' }}>
+      {TABS.map(([id, label, icon]) => { const on = tab === id; return <button key={id} onClick={() => setTab(id)} className="press" style={{ flex:1, background:'none', border:'none', display:'flex', flexDirection:'column', alignItems:'center', gap:4, padding:'6px 0' }}><Icon name={icon} size={21} color={on ? M.ink : M.ink300} stroke={on ? 1.9 : 1.5} /><span style={{ fontFamily:FONT.mono, fontSize:8.5, letterSpacing:'0.1em', color:on ? M.ink : M.ink300 }}>{label.toUpperCase()}</span></button>; })}
+    </div>
+    {logDate && <LogSheet date={logDate} existing={logs.find(l => l.log_date === logDate)} model={model} onClose={() => setLogDate(null)} onSave={save} onDelete={del} />}
+    {showSettings && <Settings settings={settings} logs={logs} onImported={refresh} onClose={() => setShowSettings(false)} onSave={async s => { try { await store.saveSettings(s); setShowSettings(false); await refresh(); } catch (e) { setErr(e.message); } }} />}
+  </div>;
+}
+ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+</script>
+</body>
+</html>
