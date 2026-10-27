@@ -274,7 +274,7 @@ function CycleRing({ model, size = 176 }) {
     </g>
     {angle != null && <circle cx={size/2 + r*Math.cos(angle*Math.PI/180)} cy={size/2 + r*Math.sin(angle*Math.PI/180)} r="6" fill={M.ink} stroke={M.paper} strokeWidth="2.5" />}
     <text x="50%" y="46%" textAnchor="middle" fontFamily={FONT.display} fontWeight="700" fontSize={day ? 44 : 20} fill={M.ink} className="tnum">{day ? day : '—'}</text>
-    <text x="50%" y="62%" textAnchor="middle" fontFamily={FONT.mono} fontSize="9.5" letterSpacing="0.12em" fill={M.ink400}>{day ? `OF ~${length}` : 'NO PERIOD YET'}</text>
+    <text x="50%" y="62%" textAnchor="middle" fontFamily={FONT.mono} fontSize="9.5" letterSpacing="0.12em" fill={M.ink400}>{day ? `DAY${day === 1 ? '' : 'S'} OF ~${length}` : 'NO PERIOD YET'}</text>
   </svg>;
 }
 function FlowDots({ level, color = M.coral }) {
